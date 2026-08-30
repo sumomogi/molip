@@ -186,7 +186,13 @@ private struct NumberRow: View {
                 .font(.control)
                 .monospacedDigit()
                 .foregroundStyle(.primary)
-            Stepper("", value: $value, in: range, step: step)
+            // 화살표를 nil로 두면 그 방향만 비활성으로 그려진다. 범위 끝에서의
+            // 생김새는 Stepper(value:in:step:)와 같고, 값 계산만 Stepping이 맡는다.
+            Stepper("",
+                    onIncrement: value < range.upperBound
+                        ? { value = Stepping.up(value, in: range, step: step) } : nil,
+                    onDecrement: value > range.lowerBound
+                        ? { value = Stepping.down(value, in: range, step: step) } : nil)
                 .labelsHidden()
                 .controlSize(.small)
         }
