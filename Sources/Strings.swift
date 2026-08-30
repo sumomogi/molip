@@ -39,6 +39,9 @@ enum L10n {
         // 기록 화면
         case history, historyBest, historyAdvice, historyNotEnough, historyEmpty
         case weekTotal, durationHM, durationM
+        // 체크인·마감
+        case checkIn, checkOut, onDuty, closing, copyImage, copied
+        case cardSummary
     }
 
     static func s(_ key: Key) -> String { s(key, lang: Prefs.language) }
@@ -91,6 +94,13 @@ enum L10n {
             .weekTotal: "이번 주",
             .durationHM: "%d시간 %d분",
             .durationM: "%d분",
+            .checkIn: "체크인",
+            .checkOut: "체크아웃",
+            .onDuty: "근무",
+            .closing: "마감",
+            .copyImage: "이미지 복사",
+            .copied: "복사됨",
+            .cardSummary: "근무 %1$@ 중 %2$d%%",
         ],
 
         .en: [
@@ -123,6 +133,13 @@ enum L10n {
             .weekTotal: "This week",
             .durationHM: "%dh %dm",
             .durationM: "%dm",
+            .checkIn: "Check in",
+            .checkOut: "Check out",
+            .onDuty: "On duty",
+            .closing: "Wrap up",
+            .copyImage: "Copy image",
+            .copied: "Copied",
+            .cardSummary: "%2$d%% of %1$@ on duty",
         ],
 
         .ja: [
@@ -155,6 +172,13 @@ enum L10n {
             .weekTotal: "今週",
             .durationHM: "%d時間%d分",
             .durationM: "%d分",
+            .checkIn: "チェックイン",
+            .checkOut: "チェックアウト",
+            .onDuty: "勤務",
+            .closing: "締め",
+            .copyImage: "画像をコピー",
+            .copied: "コピーしました",
+            .cardSummary: "勤務 %1$@ のうち %2$d%%",
         ],
     ]
 }
