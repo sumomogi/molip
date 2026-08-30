@@ -60,12 +60,17 @@ final class TimerEngine: ObservableObject {
 
     /// "세트 N / M"의 N.
     var setIndex: Int {
-        let size = Prefs.setSize
-        switch phase {
-        case .longRest: return size
-        case .shortRest: return min(max(completedInSet, 1), size)
-        case .work, .idle: return min(completedInSet + 1, size)
-        }
+        Self.setIndex(completedInSet: completedInSet, setSize: Prefs.setSize)
+    }
+
+    /// 끝낸 작업 수 + 1 — 지금 하고 있거나 다음에 할 회차를 가리킨다.
+    /// 그래서 작업이 끝나는 순간 숫자가 넘어가고, 이어지는 휴식은 다음 회차를 단다.
+    /// 세트를 다 채우면 M을 넘지 않고 머물다가, 긴 휴식이 끝나며 1로 돌아온다.
+    ///
+    /// 단계마다 다른 기준을 쓰면(휴식은 방금 끝낸 회차, 대기는 다음 회차) 숫자가
+    /// 작업 시작부터 휴식 종료까지 붙박여 있어 진행이 멈춘 것처럼 보인다.
+    static func setIndex(completedInSet: Int, setSize: Int) -> Int {
+        min(completedInSet + 1, setSize)
     }
 
     var setSize: Int { Prefs.setSize }
