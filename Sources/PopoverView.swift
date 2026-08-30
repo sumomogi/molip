@@ -3,7 +3,9 @@ import ServiceManagement
 
 // MARK: - 공통 타이포
 
-private extension Font {
+/// 팝오버 전체가 쓰는 타이포. 기록·마감 화면도 같은 크기를 써야 하므로
+/// 파일 밖에서 보이게 둔다 — TextButton과 같은 이유다.
+extension Font {
     /// 상태 라벨, 세트 표시
     static let caption11 = Font.system(size: 11, weight: .medium)
     /// 큰 시계

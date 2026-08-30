@@ -20,7 +20,7 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: 0) {
 
             Text(L10n.s(.history))
-                .font(.system(size: 11, weight: .medium))
+                .font(.caption11)
                 .tracking(0.6)
                 .foregroundStyle(.tertiary)
 
@@ -28,7 +28,7 @@ struct HistoryView: View {
 
             if result.rows.isEmpty {
                 Text(L10n.s(.historyEmpty))
-                    .font(.system(size: 12))
+                    .font(.control)
                     .foregroundStyle(.secondary)
             } else {
                 Heatmap(rows: result.rows)
@@ -40,11 +40,11 @@ struct HistoryView: View {
 
             HStack {
                 Text(L10n.s(.weekTotal))
-                    .font(.system(size: 12))
+                    .font(.control)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text(Self.duration(weekSeconds))
-                    .font(.system(size: 12))
+                    .font(.control)
                     .monospacedDigit()
                     .foregroundStyle(.primary)
             }
@@ -65,16 +65,16 @@ struct HistoryView: View {
         if let best = result.best {
             VStack(alignment: .leading, spacing: 3) {
                 Text(L10n.s(.historyBest, Self.weekdayName(best.weekday), best.bandStartHour))
-                    .font(.system(size: 12))
+                    .font(.control)
                     .foregroundStyle(.primary)
                 Text(L10n.s(.historyAdvice))
-                    .font(.system(size: 12))
+                    .font(.control)
                     .foregroundStyle(.secondary)
             }
             .fixedSize(horizontal: false, vertical: true)
         } else {
             Text(L10n.s(.historyNotEnough))
-                .font(.system(size: 12))
+                .font(.control)
                 .foregroundStyle(.secondary)
         }
     }
