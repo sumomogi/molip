@@ -87,6 +87,20 @@ enum Insight {
         return Best(weekday: p.weekday, bandStartHour: p.band * bandHours)
     }
 
+    /// 이번 주에 집중한 시간(초). 주는 월요일에 시작한다.
+    ///
+    /// 히트맵과 달리 여기서는 현재 시간대를 쓴다. "이번 주"는 지금 어디에 있느냐의
+    /// 문제이지, 그때 어디에 있었느냐의 문제가 아니다.
+    static func weekSeconds(sessions: [Session], now: Date, timeZone: TimeZone) -> Int {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        cal.firstWeekday = 2                     // 월요일. 로케일에 맡기면 화면과 어긋난다.
+        guard let week = cal.dateInterval(of: .weekOfYear, for: now) else { return 0 }
+        return sessions
+            .filter { week.contains($0.start) }
+            .reduce(0) { $0 + $1.seconds }
+    }
+
     /// 농도의 기준값. 0이 아닌 칸들을 정렬해 상위 25% 지점을 쓴다.
     ///
     /// 가장 큰 칸을 기준으로 삼으면 어쩌다 한 번 4시간을 돌린 칸 하나가 나머지를

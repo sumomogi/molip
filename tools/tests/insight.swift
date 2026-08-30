@@ -108,6 +108,19 @@ import Foundation
         T.eq("동점이면 이른 요일", t.best?.weekday, 1)
         T.eq("동점 요일의 시간대", t.best?.bandStartHour, 18)
 
+        // 주는 월요일에 시작한다. 일요일 23시와 그다음 월요일 00시는 다른 주다.
+        let seoul = TimeZone(secondsFromGMT: 9 * 3600)!
+        let weekData = [sess("2026-08-31T09:00:00+09:00", 1800),   // 월
+                        sess("2026-09-06T23:30:00+09:00", 600),    // 일 (같은 주)
+                        sess("2026-09-07T00:30:00+09:00", 900)]    // 다음 월 (다른 주)
+
+        T.eq("이번 주 합계",
+             Insight.weekSeconds(sessions: weekData, now: now, timeZone: seoul), 2400)
+        T.eq("다음 주로 넘어가면 다시 센다",
+             Insight.weekSeconds(sessions: weekData,
+                                 now: sess("2026-09-07T10:00:00+09:00", 60).start,
+                                 timeZone: seoul), 900)
+
         T.finish()
     }
 }
