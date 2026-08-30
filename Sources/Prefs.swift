@@ -12,6 +12,7 @@ enum Prefs {
         static let sound = "soundEnabled"
         static let hotkey = "hotkeyEnabled"
         static let language = "language"
+        static let checkedIn = "checkedInAt"
     }
 
     /// 최초 실행 시 기본값. 이미 값이 있으면 건드리지 않는다.
@@ -49,6 +50,16 @@ enum Prefs {
     static var hotkeyEnabled: Bool {
         get { d.bool(forKey: Key.hotkey) }
         set { d.set(newValue, forKey: Key.hotkey) }
+    }
+
+    /// 열려 있는 체크인 시각. 체크아웃하면 지운다.
+    /// 하루가 열려 있는지 여부가 이 값 하나로 표현된다.
+    static var checkedInAt: Date? {
+        get { d.object(forKey: Key.checkedIn) as? Date }
+        set {
+            if let v = newValue { d.set(v, forKey: Key.checkedIn) }
+            else { d.removeObject(forKey: Key.checkedIn) }
+        }
     }
 
     /// 저장된 값이 없으면 시스템 언어를 따른다.

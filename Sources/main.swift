@@ -30,6 +30,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var outsideClickMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 어제 이전에 찍힌 체크인은 버린다. Workday.isStale의 주석 참고.
+        if let open = Prefs.checkedInAt, Workday.isStale(open, now: Date()) {
+            Prefs.checkedInAt = nil
+        }
         notifier.requestAuthorization()
         buildStatusItem()
         buildPopover()

@@ -41,6 +41,17 @@ import Foundation
         let reversed = Workday.make(checkedIn: outAt, checkedOut: inAt, sessions: [])
         T.eq("역전된 시각은 근무 0", reversed.workSeconds, 0)
 
+        // 오래된 체크인 판정. 달력은 서울 기준으로 고정해 기기 설정에 흔들리지 않게 한다.
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+
+        T.ok("같은 날이면 살아있다",
+             !Workday.isStale(at("2026-08-31T09:00:00+09:00"),
+                              now: at("2026-08-31T23:59:00+09:00"), calendar: cal))
+        T.ok("전날이면 버린다",
+             Workday.isStale(at("2026-08-30T23:00:00+09:00"),
+                             now: at("2026-08-31T00:30:00+09:00"), calendar: cal))
+
         T.finish()
     }
 }
