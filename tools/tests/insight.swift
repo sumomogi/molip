@@ -45,6 +45,33 @@ import Foundation
         data.append(sess("2026-07-11T09:00:00+09:00", 3000))
         T.eq("8주보다 오래된 것은 뺀다", Insight.make(sessions: data, now: now).sessionCount, 2)
 
+        // 컷오프 정확히 그 순간의 세션도 포함해야 한다 (>= 이므로).
+        let cutoff = now.addingTimeInterval(-Double(Insight.windowDays) * 86400)
+        let onCutoff = Session(start: cutoff, offsetSeconds: 9 * 3600, seconds: 100, completed: true)
+        T.eq("컷오프 순간도 창 안", Insight.make(sessions: [onCutoff], now: now).sessionCount, 1)
+
+        // 반복되는 습관이 어쩌다 한 번의 긴 세션에 가려지면 안 된다 —
+        // 평일 아침 50분씩 5번 + 일요일 4시간 1번.
+        let routine = [sess("2026-08-31T09:00:00+09:00", 3000), // 월
+                       sess("2026-09-01T09:00:00+09:00", 3000), // 화
+                       sess("2026-09-02T09:00:00+09:00", 3000), // 수
+                       sess("2026-09-03T09:00:00+09:00", 3000), // 목
+                       sess("2026-09-04T09:00:00+09:00", 3000), // 금
+                       sess("2026-09-06T09:00:00+09:00", 14400)] // 일, 4시간짜리 한 번
+        let routineRow = Insight.make(sessions: routine, now: now).rows[0]
+        T.ok("반복 습관이 이상치 하나에 눌리지 않는다",
+             routineRow.levels[0...4].allSatisfy { $0 > 1 })
+
+        // 같은 칸이라도 기록 당시 오프셋이 다른 세션들을 합산해야 한다.
+        let mixedOffsets = [sess("2026-08-31T09:00:00+09:00", 1000),
+                            sess("2026-08-31T09:30:00-05:00", 2000)]
+        T.eq("오프셋이 달라도 같은 칸이면 합산", Insight.make(sessions: mixedOffsets, now: now).rows[0].levels[0], 3)
+
+        // 새 사용자의 첫 화면 — 빈 배열이 죽지 않고 빈 결과를 낸다.
+        let empty = Insight.make(sessions: [], now: now)
+        T.eq("빈 배열은 빈 행", empty.rows, [])
+        T.eq("빈 배열은 0건", empty.sessionCount, 0)
+
         T.finish()
     }
 }

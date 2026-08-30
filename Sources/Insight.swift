@@ -43,21 +43,32 @@ enum Insight {
             totals[p.band][p.weekday] += s.seconds
         }
 
-        let peak = totals.flatMap { $0 }.max() ?? 0
+        let reference = reference(of: totals.flatMap { $0 })
         var rows: [Row] = []
         for band in 0..<bandCount where totals[band].contains(where: { $0 > 0 }) {
             rows.append(Row(bandStartHour: band * bandHours,
-                            levels: totals[band].map { level($0, peak: peak) }))
+                            levels: totals[band].map { level($0, reference: reference) }))
         }
         return Result(rows: rows, sessionCount: window.count)
     }
 
-    /// 가장 큰 칸과 견준 비율로 네 단계. 색은 쓰지 않고 이 단계로 알파만 준다.
-    static func level(_ seconds: Int, peak: Int) -> Int {
-        guard seconds > 0, peak > 0 else { return 0 }
-        let r = Double(seconds) / Double(peak)
-        if r > 2.0 / 3.0 { return 3 }
-        if r > 1.0 / 3.0 { return 2 }
+    /// 농도의 기준값. 0이 아닌 칸들을 정렬해 상위 25% 지점을 쓴다.
+    ///
+    /// 가장 큰 칸을 기준으로 삼으면 어쩌다 한 번 4시간을 돌린 칸 하나가 나머지를
+    /// 전부 최저 단계로 눌러버린다. 정작 보여줘야 할 반복되는 습관이 지워진다.
+    static func reference(of cells: [Int]) -> Int {
+        let nonZero = cells.filter { $0 > 0 }.sorted()
+        guard !nonZero.isEmpty else { return 0 }
+        let rank = Int((Double(nonZero.count) * 0.75).rounded(.up))
+        return nonZero[min(rank, nonZero.count) - 1]
+    }
+
+    /// 기준값과 견준 비율로 네 단계. 기준을 넘는 칸은 전부 최고 단계다.
+    static func level(_ seconds: Int, reference: Int) -> Int {
+        guard seconds > 0, reference > 0 else { return 0 }
+        let r = Double(seconds) / Double(reference)
+        if r >= 1.0 { return 3 }
+        if r > 2.0 / 3.0 { return 2 }
         return 1
     }
 }
