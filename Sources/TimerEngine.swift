@@ -32,8 +32,14 @@ final class TimerEngine: ObservableObject {
     /// @Published와 달리 값이 이미 갱신된 뒤에 불리는 것이 보장된다.
     var onUpdate: (() -> Void)?
 
+    /// 작업 세션 하나가 끝날 때마다 불린다. 파일에 적는 일은 이 콜백을 받는 쪽이 한다.
+    /// 엔진이 파일을 직접 만지면 파일 없이 검증할 수 없게 된다.
+    var onWorkSessionEnded: ((Session) -> Void)?
+
     private var endDate: Date?
     private var ticker: Timer?
+    /// 지금 돌고 있는 작업 세션이 시작된 시각. 작업이 아니면 nil.
+    private var workStartedAt: Date?
 
     init() {
         remaining = TimeInterval(Prefs.workMinutes * 60)
@@ -104,6 +110,15 @@ final class TimerEngine: ObservableObject {
         }
     }
 
+    /// 기록할 길이. 벽시계로 흐른 시간을 쓰되 단계 길이를 넘지 않는다.
+    /// 맥이 잠들어도 실제로 흐른 만큼이 남고, 시계가 튀어도 한 세션이 부풀지 않는다.
+    static func recordedSeconds(elapsed: TimeInterval, cap: TimeInterval) -> TimeInterval {
+        min(max(elapsed, 0), cap)
+    }
+
+    /// 너무 짧은 것은 남기지 않는다. 눌렀다 바로 끈 것까지 리듬으로 세면 그림이 흐려진다.
+    static func worthRecording(seconds: Int) -> Bool { seconds >= 60 }
+
     // MARK: - 조작
 
     func toggle() {
@@ -112,6 +127,7 @@ final class TimerEngine: ObservableObject {
 
     /// 수동 정지. 세트 진행도까지 초기화한다.
     func stop() {
+        endWorkSession(completed: false)
         ticker?.invalidate()
         ticker = nil
         endDate = nil
@@ -130,8 +146,23 @@ final class TimerEngine: ObservableObject {
 
     // MARK: - 내부
 
+    /// 돌고 있던 작업 세션을 닫고 알린다. 작업 중이 아니었으면 아무 일도 하지 않는다.
+    private func endWorkSession(completed: Bool) {
+        guard let started = workStartedAt else { return }
+        workStartedAt = nil
+        let length = Self.recordedSeconds(elapsed: Date().timeIntervalSince(started),
+                                          cap: TimeInterval(Prefs.workMinutes * 60))
+        let seconds = Int(length.rounded())
+        guard Self.worthRecording(seconds: seconds) else { return }
+        onWorkSessionEnded?(Session(start: started,
+                                    offsetSeconds: TimeZone.current.secondsFromGMT(for: started),
+                                    seconds: seconds,
+                                    completed: completed))
+    }
+
     private func begin(_ next: Phase) {
         phase = next
+        if next == .work { workStartedAt = Date() }
         let seconds = total
         remaining = seconds
         endDate = Date().addingTimeInterval(seconds)
@@ -161,6 +192,7 @@ final class TimerEngine: ObservableObject {
         ticker = nil
         endDate = nil
         guard finished != .idle else { return }
+        if finished == .work { endWorkSession(completed: true) }
 
         let step = Self.nextStep(after: finished,
                                  completedInSet: completedInSet,
