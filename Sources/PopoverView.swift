@@ -245,7 +245,8 @@ private struct SwitchRow: View {
 }
 
 /// 테두리 없는 텍스트 버튼. 눌림 상태는 명도로만 표시한다.
-private struct TextButton: View {
+/// 기록 화면도 같은 버튼을 쓰므로 파일 밖에서 보이게 둔다.
+struct TextButton: View {
     let title: String
     var prominent: Bool = false
     let action: () -> Void
