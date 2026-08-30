@@ -20,21 +20,33 @@ struct RootView: View {
     var onLanguageChange: () -> Void
     var onQuit: () -> Void
 
-    @State private var showingSettings = false
+    enum Screen { case timer, settings, history }
+    @State private var screen: Screen = .timer
+
+    /// 기록 화면에 들어갈 때 한 번만 읽는다.
+    /// RootView는 엔진을 관찰하므로, 여기서 바로 파일을 읽으면 타이머가 0.5초마다
+    /// 틱할 때마다 디스크를 다시 긁는다.
+    @State private var sessions: [Session] = []
 
     // 언어 키를 여기서 관찰한다. 바뀌면 아래 트리 전체가 다시 그려진다.
     @AppStorage(Prefs.Key.language) private var langRaw = Prefs.language.rawValue
 
     var body: some View {
         Group {
-            if showingSettings {
+            switch screen {
+            case .settings:
                 SettingsView(engine: engine,
                              onHotkeyToggle: onHotkeyToggle,
                              onQuit: onQuit,
-                             onClose: { showingSettings = false })
-            } else {
+                             onClose: { screen = .timer })
+            case .history:
+                HistoryView(sessions: sessions,
+                            onClose: { screen = .timer },
+                            onSettings: { screen = .settings })
+            case .timer:
                 TimerView(engine: engine,
-                          onSettings: { showingSettings = true })
+                          onHistory: { sessions = SessionLog.load(); screen = .history },
+                          onSettings: { screen = .settings })
             }
         }
         .frame(width: 240)
@@ -47,6 +59,7 @@ struct RootView: View {
 
 private struct TimerView: View {
     @ObservedObject var engine: TimerEngine
+    var onHistory: () -> Void
     var onSettings: () -> Void
 
     var body: some View {
@@ -79,11 +92,12 @@ private struct TimerView: View {
 
             Spacer().frame(height: 12)
 
-            HStack {
+            HStack(spacing: 12) {
                 TextButton(L10n.s(engine.isRunning ? .stop : .start), prominent: true) {
                     engine.toggle()
                 }
                 Spacer()
+                TextButton(L10n.s(.history), action: onHistory)
                 TextButton(L10n.s(.settings), action: onSettings)
             }
         }
