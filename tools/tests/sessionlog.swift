@@ -55,6 +55,13 @@ import Foundation
         // nil로 거부해야 나중에 시간대별 통계가 조용히 틀리지 않는다.
         T.eq("오프셋 파싱: 콜론 없는 오프셋은 nil", SessionLog.offset(from: "2026-08-30T15:44:04+0900"), nil)
 
+        // 형식은 멀쩡해도 값이 말이 안 되면(+99:99) 실제 UTC 오프셋이 아니다 — 조용히
+        // 삼켜서 엉뚱한 시간대로 읽느니 nil로 그 줄을 버려야 한다.
+        T.eq("오프셋 파싱: +99:99는 nil", SessionLog.offset(from: "2026-08-30T15:44:04+99:99"), nil)
+        T.eq("세션 읽기: +99:99가 실린 줄은 nil",
+             SessionLog.session(from: "{\"start\":\"2026-08-30T15:44:04+99:99\",\"seconds\":10,\"completed\":true}"),
+             nil)
+
         T.eq("깨진 줄은 nil", SessionLog.session(from: "{\"start\":\"2026-08"), nil)
         T.eq("빈 줄은 nil", SessionLog.session(from: ""), nil)
 

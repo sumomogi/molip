@@ -59,6 +59,10 @@ enum SessionLog {
     /// `±HH:MM` 형식(콜론 포함)이 아니면 nil — 굳이 관대하게 읽어서 잘못된 0을
     /// 만들 바엔 그 줄을 버리는 편이 낫다.
     ///
+    /// 형식만 맞고 값이 말이 안 되는 경우(`+99:99`)도 같은 이유로 nil이어야 한다.
+    /// 실제 UTC 오프셋은 ±18시간을 넘지 않고 분은 60 미만이다 — 아니면 오타를
+    /// 조용히 삼켜 엉뚱한 요일·시간대로 통계를 뒤섞는다.
+    ///
     /// `JSONEncoder`의 `.iso8601` 전략은 UTC로 적어 이 정보를 잃는다. 그래서 쓰지 않는다.
     static func offset(from iso: String) -> Int? {
         if iso.hasSuffix("Z") { return 0 }
@@ -67,7 +71,8 @@ enum SessionLog {
               (tail.hasPrefix("+") || tail.hasPrefix("-")),
               tail[tail.index(tail.startIndex, offsetBy: 3)] == ":",
               let h = Int(tail.dropFirst().prefix(2)),
-              let m = Int(tail.suffix(2)) else { return nil }
+              let m = Int(tail.suffix(2)),
+              h <= 18, m < 60 else { return nil }
         return (tail.hasPrefix("-") ? -1 : 1) * (h * 3600 + m * 60)
     }
 
