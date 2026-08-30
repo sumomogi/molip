@@ -74,22 +74,31 @@ enum SessionLog {
     // MARK: - 파일
 
     /// 한 줄 덧붙인다. 디렉터리가 없으면 만든다.
+    ///
+    /// O_APPEND로 연다. seekToEnd 후 write는 두 번의 시스템 콜이라 그 사이에 다른
+    /// 쓰기가 끼면 한 줄이 통째로 덮인다. O_APPEND는 커널이 파일 끝에 붙여주므로
+    /// 자리를 다투지 않고, 실패할 seek 자체가 없다. O_CREAT가 있어 파일이 없을 때의
+    /// 별도 분기도 필요 없다.
     static func append(_ s: Session) {
         let dir = url.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let data = Data((line(for: s) + "\n").utf8)
-        if let h = try? FileHandle(forWritingTo: url) {
-            defer { try? h.close() }
-            _ = try? h.seekToEnd()
-            try? h.write(contentsOf: data)
-        } else {
-            try? data.write(to: url)
-        }
+        let fd = open(url.path, O_WRONLY | O_APPEND | O_CREAT, 0o644)
+        guard fd >= 0 else { return }
+        let h = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        defer { try? h.close() }
+        try? h.write(contentsOf: Data((line(for: s) + "\n").utf8))
     }
 
     /// 읽을 수 없는 줄은 건너뛴다. 쓰다 만 마지막 줄 하나 때문에 전체를 잃지 않는다.
+    ///
+    /// 파일 전체를 String으로 먼저 디코드하면 안 된다. 깨진 바이트 하나로 디코드가
+    /// 통째로 실패해서 몇 년치 기록이 한꺼번에 사라진다. 바이트로 먼저 줄을 가르고
+    /// 줄마다 따로 디코드해야 손실이 그 한 줄에서 멈춘다.
     static func load() -> [Session] {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-        return text.split(separator: "\n").compactMap { session(from: String($0)) }
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        return data.split(separator: 0x0A).compactMap {
+            session(from: String(decoding: $0, as: UTF8.self)
+                        .trimmingCharacters(in: .whitespacesAndNewlines))
+        }
     }
 }
