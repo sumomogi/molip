@@ -82,10 +82,14 @@ struct HistoryView: View {
     /// 요일 이름만은 Strings 표에 넣지 않고 시스템에서 가져온다.
     /// 21개 항목을 손으로 관리하는 대신 선택된 언어의 로케일을 넘긴다.
     /// README의 "문자열은 전부 표에" 규칙에 대한 의도적 예외다.
+    ///
+    /// 격자 헤더처럼 한 글자짜리가 필요할 땐 shortWeekdaySymbols를 잘라내지 않고
+    /// veryShortWeekdaySymbols를 쓴다. 시스템이 이미 한 글자 표기를 갖고 있으니
+    /// 임의로 잘라 만들 필요가 없고, 자르면 어색해지는 언어가 와도 안전하다.
     static func weekdayName(_ mondayBased: Int, short: Bool = false) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: Prefs.language.rawValue)
-        let symbols = short ? f.shortWeekdaySymbols! : f.weekdaySymbols!
+        let symbols = short ? f.veryShortWeekdaySymbols! : f.weekdaySymbols!
         return symbols[(mondayBased + 1) % 7]     // 표의 0번은 일요일
     }
 
@@ -109,7 +113,7 @@ private struct Heatmap: View {
             HStack(spacing: gap) {
                 Spacer().frame(width: gutter)
                 ForEach(0..<7, id: \.self) { i in
-                    Text(HistoryView.weekdayName(i, short: true).prefix(1))
+                    Text(HistoryView.weekdayName(i, short: true))
                         .font(.system(size: 9))
                         .foregroundStyle(.tertiary)
                         .frame(width: cell)
