@@ -56,34 +56,35 @@ enum Insight {
             counts[p.band][p.weekday] += 1
         }
 
-        let reference = reference(of: totals.flatMap { $0 })
+        let densityReference = reference(of: totals.flatMap { $0 })
         var rows: [Row] = []
         for band in 0..<bandCount where totals[band].contains(where: { $0 > 0 }) {
             rows.append(Row(bandStartHour: band * bandHours,
-                            levels: totals[band].map { level($0, reference: reference) }))
+                            levels: totals[band].map { level($0, reference: densityReference) }))
         }
         return Result(rows: rows,
                       best: best(totals: totals, counts: counts, sessionCount: window.count),
                       sessionCount: window.count)
     }
 
-    /// 합계가 가장 큰 칸. 동점이면 이른 요일, 그다음 이른 시간대.
+    /// 세션이 충분히 쌓인 칸 중에서 합계가 가장 큰 칸. 동점이면 이른 요일, 그다음 이른 시간대.
+    ///
+    /// 후보를 먼저 거른 뒤에 고른다. 합계로 먼저 뽑고 나서 그 칸만 문턱에 걸어보면,
+    /// 어쩌다 길게 한 번 한 칸이 합계가 크다는 이유로 뽑히고 문턱에서 떨어지면서,
+    /// 정작 꾸준히 집중해온 칸이 있는데도 앱이 아무 말도 못 하게 된다.
     private static func best(totals: [[Int]], counts: [[Int]], sessionCount: Int) -> Best? {
         guard sessionCount >= minSessions else { return nil }
 
         var pick: (weekday: Int, band: Int, seconds: Int)?
         // 요일을 바깥에서 돌아 먼저 만난 쪽이 이기게 한다.
         for weekday in 0..<7 {
-            for band in 0..<bandCount {
+            for band in 0..<bandCount where counts[band][weekday] >= minBestSessions {
                 let seconds = totals[band][weekday]
-                guard seconds > 0 else { continue }
-                if pick == nil || seconds > pick!.seconds {
-                    pick = (weekday, band, seconds)
-                }
+                if seconds > (pick?.seconds ?? 0) { pick = (weekday, band, seconds) }
             }
         }
 
-        guard let p = pick, counts[p.band][p.weekday] >= minBestSessions else { return nil }
+        guard let p = pick else { return nil }
         return Best(weekday: p.weekday, bandStartHour: p.band * bandHours)
     }
 

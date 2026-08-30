@@ -108,6 +108,33 @@ import Foundation
         T.eq("동점이면 이른 요일", t.best?.weekday, 1)
         T.eq("동점 요일의 시간대", t.best?.bandStartHour, 18)
 
+        // 합계가 가장 큰 칸이라도 세션이 2번뿐이면 후보에서 빠지고,
+        // 세션이 꾸준히 쌓인 다른 칸이 뽑혀야 한다 — 합계로 먼저 줄 세우고
+        // 나서 문턱에 걸면, 어쩌다 길게 두 번 한 칸 때문에 앱이 통째로 침묵하게 된다.
+        var thinPeakVsSteady = [sess("2026-08-25T15:30:00+09:00", 6000),
+                                 sess("2026-09-01T15:30:00+09:00", 6000)]        // 화 15시, 합 12000, 2세션
+        for d in [22, 29] { thinPeakVsSteady.append(sess("2026-07-\(d)T09:30:00+09:00", 1000)) }
+        for d in [5, 12, 19, 26] { thinPeakVsSteady.append(sess("2026-08-\(d)T09:30:00+09:00", 1000)) }
+        thinPeakVsSteady.append(sess("2026-09-02T09:30:00+09:00", 1000))         // 수 09시, 합 7000, 7세션
+        thinPeakVsSteady.append(sess("2026-08-27T00:30:00+09:00", 100))          // 목 00시, 1세션 — 그냥 채우기용
+
+        let steady = Insight.make(sessions: thinPeakVsSteady, now: later)
+        T.eq("얇은 최댓값 대신 세션이 쌓인 칸 요일", steady.best?.weekday, 2)     // 수요일
+        T.eq("얇은 최댓값 대신 세션이 쌓인 칸 시간", steady.best?.bandStartHour, 9)
+
+        // 같은 요일 안에서 두 시간대가 합계로 동점이면 이른 시간대가 이긴다.
+        var sameWeekdayTied: [Session] = []
+        for date in ["2026-08-25", "2026-09-01", "2026-09-08"] {
+            sameWeekdayTied.append(sess("\(date)T06:30:00+09:00", 1200))         // 화 06시, 합 3600
+            sameWeekdayTied.append(sess("\(date)T15:30:00+09:00", 1200))         // 화 15시, 합 3600
+        }
+        for date in ["2026-08-21", "2026-08-28", "2026-09-04", "2026-09-11"] {
+            sameWeekdayTied.append(sess("\(date)T21:30:00+09:00", 10))           // 금 21시, 채우기용
+        }
+        let sameWeekday = Insight.make(sessions: sameWeekdayTied, now: later)
+        T.eq("같은 요일 동점은 이른 시간대", sameWeekday.best?.weekday, 1)        // 화요일
+        T.eq("같은 요일 동점 — 이른 밴드", sameWeekday.best?.bandStartHour, 6)
+
         // 주는 월요일에 시작한다. 일요일 23시와 그다음 월요일 00시는 다른 주다.
         let seoul = TimeZone(secondsFromGMT: 9 * 3600)!
         let weekData = [sess("2026-08-31T09:00:00+09:00", 1800),   // 월
