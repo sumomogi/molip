@@ -38,8 +38,11 @@ final class TimerEngine: ObservableObject {
 
     private var endDate: Date?
     private var ticker: Timer?
-    /// 지금 돌고 있는 작업 세션이 시작된 시각. 작업이 아니면 nil.
-    private var workStartedAt: Date?
+    /// 지금 돌고 있는 작업 세션이 시작된 시각과 그때 정해진 길이. 작업이 아니면 nil.
+    ///
+    /// 길이를 시작할 때 붙잡아 둔다. 끝날 때 설정을 다시 읽으면, 도중에 작업 시간을
+    /// 줄인 경우 실제로 50분을 한 세션이 25분으로 잘려 기록된다.
+    private var workStarted: (at: Date, cap: TimeInterval)?
 
     init() {
         remaining = TimeInterval(Prefs.workMinutes * 60)
@@ -148,21 +151,21 @@ final class TimerEngine: ObservableObject {
 
     /// 돌고 있던 작업 세션을 닫고 알린다. 작업 중이 아니었으면 아무 일도 하지 않는다.
     private func endWorkSession(completed: Bool) {
-        guard let started = workStartedAt else { return }
-        workStartedAt = nil
-        let length = Self.recordedSeconds(elapsed: Date().timeIntervalSince(started),
-                                          cap: TimeInterval(Prefs.workMinutes * 60))
+        guard let started = workStarted else { return }
+        workStarted = nil
+        let length = Self.recordedSeconds(elapsed: Date().timeIntervalSince(started.at),
+                                          cap: started.cap)
         let seconds = Int(length.rounded())
         guard Self.worthRecording(seconds: seconds) else { return }
-        onWorkSessionEnded?(Session(start: started,
-                                    offsetSeconds: TimeZone.current.secondsFromGMT(for: started),
+        onWorkSessionEnded?(Session(start: started.at,
+                                    offsetSeconds: TimeZone.current.secondsFromGMT(for: started.at),
                                     seconds: seconds,
                                     completed: completed))
     }
 
     private func begin(_ next: Phase) {
         phase = next
-        if next == .work { workStartedAt = Date() }
+        if next == .work { workStarted = (at: Date(), cap: TimeInterval(Prefs.workMinutes * 60)) }
         let seconds = total
         remaining = seconds
         endDate = Date().addingTimeInterval(seconds)
