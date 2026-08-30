@@ -27,20 +27,33 @@ enum Insight {
         let levels: [Int]
     }
 
+    struct Best: Equatable {
+        let weekday: Int
+        let bandStartHour: Int
+    }
+
     struct Result: Equatable {
         let rows: [Row]
+        let best: Best?
         let sessionCount: Int
     }
+
+    /// 문장을 내기 전에 넘겨야 하는 두 문턱.
+    /// 두 번 집중한 것을 두고 "화요일이 최적입니다"라고 단언하면 앱을 못 믿게 된다.
+    static let minSessions = 10
+    static let minBestSessions = 3
 
     static func make(sessions: [Session], now: Date) -> Result {
         let cutoff = now.addingTimeInterval(-Double(windowDays) * 86400)
         let window = sessions.filter { $0.start >= cutoff }
 
-        // [시간대][요일] 합계 초
+        // [시간대][요일]의 합계 초와 세션 수
         var totals = Array(repeating: Array(repeating: 0, count: 7), count: bandCount)
+        var counts = Array(repeating: Array(repeating: 0, count: 7), count: bandCount)
         for s in window {
             let p = slot(of: s)
             totals[p.band][p.weekday] += s.seconds
+            counts[p.band][p.weekday] += 1
         }
 
         let reference = reference(of: totals.flatMap { $0 })
@@ -49,7 +62,29 @@ enum Insight {
             rows.append(Row(bandStartHour: band * bandHours,
                             levels: totals[band].map { level($0, reference: reference) }))
         }
-        return Result(rows: rows, sessionCount: window.count)
+        return Result(rows: rows,
+                      best: best(totals: totals, counts: counts, sessionCount: window.count),
+                      sessionCount: window.count)
+    }
+
+    /// 합계가 가장 큰 칸. 동점이면 이른 요일, 그다음 이른 시간대.
+    private static func best(totals: [[Int]], counts: [[Int]], sessionCount: Int) -> Best? {
+        guard sessionCount >= minSessions else { return nil }
+
+        var pick: (weekday: Int, band: Int, seconds: Int)?
+        // 요일을 바깥에서 돌아 먼저 만난 쪽이 이기게 한다.
+        for weekday in 0..<7 {
+            for band in 0..<bandCount {
+                let seconds = totals[band][weekday]
+                guard seconds > 0 else { continue }
+                if pick == nil || seconds > pick!.seconds {
+                    pick = (weekday, band, seconds)
+                }
+            }
+        }
+
+        guard let p = pick, counts[p.band][p.weekday] >= minBestSessions else { return nil }
+        return Best(weekday: p.weekday, bandStartHour: p.band * bandHours)
     }
 
     /// 농도의 기준값. 0이 아닌 칸들을 정렬해 상위 25% 지점을 쓴다.

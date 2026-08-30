@@ -72,6 +72,42 @@ import Foundation
         T.eq("빈 배열은 빈 행", empty.rows, [])
         T.eq("빈 배열은 0건", empty.sessionCount, 0)
 
+        // 조건을 넘기려면 창 안 10세션, 그리고 최다 칸에 3세션이 필요하다.
+        // 2026-08-25 / 09-01 / 09-08 은 모두 화요일이다.
+        let later = sess("2026-09-13T20:00:00+09:00", 60).start
+
+        var many = [sess("2026-08-25T15:30:00+09:00", 3000),
+                    sess("2026-09-01T15:30:00+09:00", 3000),
+                    sess("2026-09-08T15:30:00+09:00", 3000)]
+        for d in 0..<7 { many.append(sess("2026-09-0\(1 + d)T09:30:00+09:00", 60)) }
+
+        let full = Insight.make(sessions: many, now: later)
+        T.eq("최다 칸 요일", full.best?.weekday, 1)          // 화요일
+        T.eq("최다 칸 시간", full.best?.bandStartHour, 15)
+
+        // 9세션이면 침묵. 최다 칸은 여전히 3세션이다.
+        T.eq("세션이 모자라면 문장 없음",
+             Insight.make(sessions: Array(many.prefix(9)), now: later).best, nil)
+
+        // 세션 수는 충분해도 최다 칸이 2세션이면 침묵.
+        var thin = [sess("2026-09-01T15:30:00+09:00", 3000),
+                    sess("2026-09-08T15:30:00+09:00", 3000)]
+        for d in 0..<9 { thin.append(sess("2026-09-0\(1 + d)T06:30:00+09:00", 60)) }
+        T.eq("최다 칸이 얇으면 문장 없음", Insight.make(sessions: thin, now: later).best, nil)
+
+        // 동점이면 이른 요일, 그다음 이른 시간대.
+        var tied = [sess("2026-08-25T18:30:00+09:00", 1200),
+                    sess("2026-09-01T18:30:00+09:00", 1200),
+                    sess("2026-09-08T18:30:00+09:00", 1200)]   // 화 18시, 합 3600
+        tied += [sess("2026-08-26T15:30:00+09:00", 1200),
+                 sess("2026-09-02T15:30:00+09:00", 1200),
+                 sess("2026-09-09T15:30:00+09:00", 1200)]      // 수 15시, 합 3600
+        for d in 0..<4 { tied.append(sess("2026-09-0\(1 + d)T06:30:00+09:00", 60)) }
+
+        let t = Insight.make(sessions: tied, now: later)
+        T.eq("동점이면 이른 요일", t.best?.weekday, 1)
+        T.eq("동점 요일의 시간대", t.best?.bandStartHour, 18)
+
         T.finish()
     }
 }
