@@ -34,6 +34,10 @@ final class TimerEngine: ObservableObject {
 
     /// 작업 세션 하나가 끝날 때마다 불린다. 파일에 적는 일은 이 콜백을 받는 쪽이 한다.
     /// 엔진이 파일을 직접 만지면 파일 없이 검증할 수 없게 된다.
+    ///
+    /// onComplete와 달리 이 콜백은 단계가 바뀌기 *전에* 불린다 — 지금은 Session이
+    /// 그 자체로 완결된 값이라 상관없지만, 나중에 여기서 engine.phase나 isRunning을
+    /// 읽는 핸들러를 붙이면 아직 옛 상태를 보게 된다는 점을 잊지 말 것.
     var onWorkSessionEnded: ((Session) -> Void)?
 
     private var endDate: Date?
@@ -165,7 +169,7 @@ final class TimerEngine: ObservableObject {
 
     private func begin(_ next: Phase) {
         phase = next
-        if next == .work { workStarted = (at: Date(), cap: TimeInterval(Prefs.workMinutes * 60)) }
+        if next == .work { workStarted = (at: Date(), cap: total) }
         let seconds = total
         remaining = seconds
         endDate = Date().addingTimeInterval(seconds)
