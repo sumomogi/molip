@@ -70,4 +70,26 @@ enum SessionLog {
               let m = Int(tail.suffix(2)) else { return nil }
         return (tail.hasPrefix("-") ? -1 : 1) * (h * 3600 + m * 60)
     }
+
+    // MARK: - 파일
+
+    /// 한 줄 덧붙인다. 디렉터리가 없으면 만든다.
+    static func append(_ s: Session) {
+        let dir = url.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let data = Data((line(for: s) + "\n").utf8)
+        if let h = try? FileHandle(forWritingTo: url) {
+            defer { try? h.close() }
+            _ = try? h.seekToEnd()
+            try? h.write(contentsOf: data)
+        } else {
+            try? data.write(to: url)
+        }
+    }
+
+    /// 읽을 수 없는 줄은 건너뛴다. 쓰다 만 마지막 줄 하나 때문에 전체를 잃지 않는다.
+    static func load() -> [Session] {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        return text.split(separator: "\n").compactMap { session(from: String($0)) }
+    }
 }

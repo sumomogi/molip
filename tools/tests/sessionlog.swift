@@ -57,6 +57,31 @@ import Foundation
         // 대조군: 형식이 맞으면 여전히 읽힌다.
         T.ok("세션 읽기: 정상 오프셋은 값을 반환", SessionLog.session(from: SessionLog.line(for: s)) != nil)
 
+        // 파일 왕복. 임시 경로로 바꿔 끼운다.
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("molip-test-\(getpid())")
+            .appendingPathComponent("sessions.jsonl")
+        SessionLog.url = tmp
+
+        T.eq("없는 파일은 빈 배열", SessionLog.load(), [])
+
+        let a = Session(start: start, offsetSeconds: 9 * 3600, seconds: 3000, completed: true)
+        let b = Session(start: start.addingTimeInterval(7200),
+                        offsetSeconds: 9 * 3600, seconds: 1620, completed: false)
+        SessionLog.append(a)
+        SessionLog.append(b)
+        T.eq("두 줄 왕복", SessionLog.load(), [a, b])
+
+        // append 도중 종료되면 마지막 줄이 잘릴 수 있다. 나머지는 살아야 한다.
+        if let h = try? FileHandle(forWritingTo: tmp) {
+            _ = try? h.seekToEnd()
+            try? h.write(contentsOf: Data("{\"start\":\"2026-08".utf8))
+            try? h.close()
+        }
+        T.eq("잘린 마지막 줄은 버리고 나머지를 읽음", SessionLog.load(), [a, b])
+
+        try? FileManager.default.removeItem(at: tmp.deletingLastPathComponent())
+
         T.finish()
     }
 }
