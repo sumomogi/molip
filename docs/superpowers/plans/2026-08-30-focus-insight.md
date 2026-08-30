@@ -21,7 +21,7 @@
 | `Sources/HistoryView.swift` | 팝오버 기록 화면 |
 | `Sources/TimerEngine.swift` | (수정) 작업 시작 시각 보관, 종료를 콜백으로 알림 |
 | `Sources/PopoverView.swift` | (수정) 화면 전환 `Bool` → `enum Screen`, 기록 버튼 |
-| `Sources/Strings.swift` | (수정) 문자열 9개 추가 |
+| `Sources/Strings.swift` | (수정) 문자열 8개 추가 |
 | `Sources/main.swift` | (수정) 콜백을 `SessionLog`에 연결, 종료 시 저장 |
 | `tools/test.sh` | 테스트 실행기 |
 | `tools/testsupport/Assert.swift` | 테스트 공용 단언 |
@@ -359,6 +359,14 @@ git add Sources/SessionLog.swift tools/tests/sessionlog.swift
 git commit -m "세션 기록 타입과 한 줄 직렬화"
 ```
 
+> **구현 중 변경.** 위 `offset(from:)`은 파싱에 실패하면 `0`을 돌려줬다. 이후 두
+> 커밋으로 고쳤다: `0a24e98`은 반환형을 `Int?`로 바꿔 실패를 `nil`로 알리게 했고
+> (그럴듯한 `0`이 실제 UTC보다 나쁘다 — 조용히 틀린 통계를 만든다),
+> `3690518`은 `+99:99`처럼 형식은 맞지만 값이 말이 안 되는 경우까지 `nil`로
+> 거르도록 범위 검증(시 ≤18, 분 <60)을 더했다. `session(from:)`도 따라서
+> `guard let off = offset(from: row.start)`로 바뀌었다 — 오프셋을 못 구하면 그
+> 줄 전체를 버린다. 실제 시그니처는 `Sources/SessionLog.swift`를 참고.
+
 ---
 
 ### Task 3: 파일 추가와 읽기
@@ -445,6 +453,23 @@ Expected: `sessionlog` 스위트가 `전부 통과`.
 git add Sources/SessionLog.swift tools/tests/sessionlog.swift
 git commit -m "세션 기록 파일 추가와 읽기"
 ```
+
+> **구현 중 발견 및 교체(`8d96565`).** 위 구현은 두 군데가 결함이 있어 그대로
+> 출하되지 않았다.
+>
+> `append`의 `seekToEnd` 후 `write`는 시스템 콜 두 번이다 — 그 사이에 다른
+> 프로세스의 쓰기가 끼면 한 줄이 통째로 덮인다. 실제 구현은 `open(..., O_WRONLY
+> | O_APPEND | O_CREAT, 0o644)`로 파일을 연다. `O_APPEND`는 커널이 파일 끝에
+> 붙여주므로 자리를 다투지 않고, `O_CREAT`가 있어 파일이 없을 때의 별도 분기도
+> 필요 없다.
+>
+> `load`의 `String(contentsOf:encoding:)`은 파일 전체를 한 번에 디코드한다 —
+> 깨진 바이트 하나나 CRLF 줄바꿈 하나로 디코드가 통째로 실패해 몇 년치 기록이
+> 한꺼번에 사라진다. 실제 구현은 `Data(contentsOf:)`로 바이트를 읽고
+> `data.split(separator: 0x0A)`로 먼저 줄을 가른 뒤 줄마다 따로
+> `String(decoding:as:)`한다 — 손실이 그 한 줄에서 멈춘다.
+>
+> 최종 형태는 `Sources/SessionLog.swift`의 `append(_:)`, `load()` 참고.
 
 ---
 
@@ -640,6 +665,16 @@ git add Sources/Insight.swift tools/tests/insight.swift
 git commit -m "히트맵 집계 — 최근 8주, 네 단계 농도, 빈 행 감추기"
 ```
 
+> **구현 중 변경(`6641c4d`, Task 6 직후).** 위 `level(_:peak:)`은 그 창에서
+> 가장 큰 칸(`peak`)과 견준 비율로 4단계를 매겼다. 실제로 만들어보니 어쩌다
+> 한 번 4시간을 돌린 칸 하나가 `peak`이 되어 나머지 칸을 전부 최저 단계로
+> 눌러버렸다 — 정작 보여줘야 할 반복 습관이 지워지는 문제였다. 그래서
+> `peak`을 없애고, 0이 아닌 칸들을 정렬해 상위 25% 지점을 쓰는
+> `reference(of:)` + `level(_:reference:)`로 바꿨다. 임계값도 `r > 1/3` 단계가
+> 없어지고 `r >= 1.0`(최고 단계) / `r > 2/3` 두 경계만 남았다. 최종 형태는
+> `Sources/Insight.swift` 참고 — 아래 Task 6 코드는 아직 옛 `peak` 버전을
+> 그대로 들고 있으니 그 밑의 주석을 봐야 한다.
+
 ---
 
 ### Task 6: 최적 구간과 침묵 기준
@@ -781,6 +816,25 @@ Expected: `insight` 스위트가 `전부 통과`.
 git add Sources/Insight.swift tools/tests/insight.swift
 git commit -m "최적 구간 선택과, 근거가 얇으면 말하지 않는 기준"
 ```
+
+> **구현 중 결함 두 가지.**
+>
+> 1. 위 `make(sessions:now:)` 코드 블록은 `peak = totals.flatMap { $0 }.max()`와
+>    `level($0, peak: peak)`을 다시 들고 있다 — Task 5 직후 커밋(`6641c4d`)에서
+>    이미 `reference(of:)` 기반으로 바꾼 것을 이 Task를 쓸 때 되돌려 붙인
+>    흔적이다. `peak`이라는 이름의 변수는 지금 코드에 없다. 실제 `make`는
+>    `let densityReference = reference(of: totals.flatMap { $0 })`를 쓴다.
+>
+> 2. `best(totals:counts:sessionCount:)`도 이 커밋(`f103fa9`) 시점엔 위 코드
+>    그대로 — **합계가 가장 큰 칸을 먼저 고르고, 그 칸 하나에만 3세션 문턱을
+>    검사**하는 순서였다(`guard let p = pick, counts[p.band][p.weekday] >=
+>    minBestSessions else { return nil }`). 바로 다음 커밋 `7fb3e45`("best()는
+>    후보를 먼저 거른 뒤 합계로 고른다")에서 순서를 뒤집었다: 안쪽 루프를
+>    `for band in 0..<bandCount where counts[band][weekday] >= minBestSessions`로
+>    바꿔 **후보를 먼저 거르고, 그 후보들 안에서만 합계를 비교**한다. 이유는
+>    같다 — 어쩌다 한 번 길게 집중한 칸이 합계만으로 먼저 뽑혔다가 문턱에서
+>    떨어지면, 꾸준히 쌓아온 다른 칸이 있어도 앱이 침묵한다. 최종 형태는
+>    `Sources/Insight.swift`의 `best(totals:counts:sessionCount:)` 참고.
 
 ---
 
@@ -954,6 +1008,17 @@ Expected: 컴파일 실패 — `type 'TimerEngine' has no member 'recordedSecond
     }
 ```
 
+> **구현 중 변경(`c602d76`, `e312723`).** 위 `endWorkSession`은 세션이 *끝나는*
+> 시점에 `Prefs.workMinutes`를 다시 읽어 `cap`을 계산했다. 세션이 도는 동안
+> 사용자가 설정에서 작업 길이를 바꾸면, 기록되는 상한이 시작할 때와 달라질 수
+> 있다는 뜻이다. `c602d76`이 상한을 *시작* 시점 값으로 고정했고, `e312723`이
+> 한 걸음 더 나아가 `cap`을 따로 계산하지 않고 `begin(_:)`에서 이미 `.work`로
+> 바뀐 뒤의 `total`을 그대로 재사용하도록 했다("기록되는 길이와 화면에
+> 표시되는 길이가 구조적으로 어긋날 수 없게"). 그래서 `workStartedAt: Date?`
+> 하나 대신 `workStarted: (at: Date, cap: TimeInterval)?` 튜플을 쓴다. 최종
+> 형태는 `Sources/TimerEngine.swift`의 `workStarted`, `begin(_:)`,
+> `endWorkSession(completed:)` 참고.
+
 - [ ] **Step 4: 돌려서 통과 확인**
 
 Run: `./tools/test.sh`
@@ -975,7 +1040,10 @@ git commit -m "작업 세션이 끝날 때 콜백으로 알리기"
 
 ---
 
-### Task 9: 문자열 아홉 개
+### Task 9: 문자열 여덟 개
+
+<!-- 원래 "아홉 개"였다. 아래에 실제로 더한 키는 history, historyBest, historyAdvice,
+     historyNotEnough, historyEmpty, weekTotal, durationHM, durationM 여덟이다. -->
 
 **Files:**
 - Modify: `Sources/Strings.swift`
@@ -1449,6 +1517,13 @@ git commit -m "세션을 파일에 적고, 종료할 때도 남기기"
 문장은 두 문턱을 넘어야 나온다 — 창 안에 10세션 이상, 그리고 가장 큰 칸에 3세션 이상.
 두 번 집중한 것을 두고 "화요일이 최적입니다"라고 단언하면 앱을 못 믿게 된다.
 ```
+
+> **이 초안 자체가 Task 6의 결함(위 참고)을 그대로 담고 있다.** "가장 큰
+> 칸에 3세션 이상"이라는 문구는 합계로 먼저 고른 뒤 그 칸에만 문턱을 검사하는
+> 순서를 전제한다 — 실제로 그렇게 만들었다가 `7fb3e45`로 되돌린 순서다. 또한
+> 농도가 최댓값이 아니라 상위 25% 지점을 기준으로 한다는 사실도 이 초안엔
+> 아예 없다. `README.md`에 실제로 들어간 `### 기록` 절은 두 가지를 모두
+> 반영해 다시 썼다 — 최종 문구는 `README.md`를 참고.
 
 - [ ] **Step 3: 테스트 실행 방법 적기**
 
