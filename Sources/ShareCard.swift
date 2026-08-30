@@ -35,24 +35,28 @@ enum ShareCard {
         NSRect(x: 0, y: 0, width: s, height: s).fill()
 
         // 좌표 원점은 좌하단이다. 위에서부터 쌓기 위해 y를 내려가며 잡는다.
+        //
+        // 내용의 자연 높이는 40+190+40+26+38 = 334pt이고 쓸 수 있는 세로는 888pt다.
+        // 남는 554pt를 한 곳에 몰면 카드 아래가 통째로 비어 잘린 것처럼 보인다.
+        // 라벨은 자기 숫자에 붙이고(18·22pt), 나머지를 큰 간격 셋으로 나눈다.
         var y = s - margin
 
         y -= 40
         text(dateLine(day.checkedIn), at: NSPoint(x: margin, y: y),
              size: 34, weight: .medium, alpha: 0.55)
 
-        y -= 210
+        y -= 350
         text(Workday.clock(day.focusSeconds), at: NSPoint(x: margin, y: y),
              size: 190, weight: .thin, alpha: 1.0)
 
-        y -= 60
+        y -= 58
         text(L10n.s(.phaseWork), at: NSPoint(x: margin, y: y),
              size: 40, weight: .medium, alpha: 0.55)
 
-        y -= 150
+        y -= 216
         bar(ratio: day.ratio, at: NSPoint(x: margin, y: y), width: s - margin * 2)
 
-        y -= 70
+        y -= 60
         let work = duration(day.workSeconds)
         let pct = Int((day.ratio * 100).rounded())
         text(L10n.s(.cardSummary, work, pct), at: NSPoint(x: margin, y: y),
