@@ -25,6 +25,26 @@ import Foundation
             Insight.slot(of: at("2026-08-31T00:00:00Z")).band,        // 같은 순간, 00시로 적힘
         ], [3, 0])
 
+        func sess(_ iso: String, _ seconds: Int) -> Session {
+            SessionLog.session(from: "{\"start\":\"\(iso)\",\"seconds\":\(seconds),\"completed\":true}")!
+        }
+        let now = sess("2026-09-06T20:00:00+09:00", 60).start   // 일요일 저녁
+
+        // 월 09시대에 크게, 화 15시대에 작게.
+        var data = [sess("2026-08-31T09:00:00+09:00", 3000),
+                    sess("2026-09-01T15:00:00+09:00", 600)]
+
+        let r = Insight.make(sessions: data, now: now)
+        T.eq("빈 행은 감춘다", r.rows.map(\.bandStartHour), [9, 15])
+        T.eq("가장 큰 칸은 최고 농도", r.rows[0].levels[0], 3)
+        T.eq("1/3 이하는 낮은 농도", r.rows[1].levels[1], 1)
+        T.eq("빈 칸은 0", r.rows[0].levels[3], 0)
+        T.eq("창 안 세션 수", r.sessionCount, 2)
+
+        // 57일 전 세션은 창 밖.
+        data.append(sess("2026-07-11T09:00:00+09:00", 3000))
+        T.eq("8주보다 오래된 것은 뺀다", Insight.make(sessions: data, now: now).sessionCount, 2)
+
         T.finish()
     }
 }
