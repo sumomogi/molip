@@ -85,7 +85,7 @@ enum L10n {
 
             .history: "기록",
             .historyBest: "%1$@ %2$d시 전후에 가장 오래 집중했습니다.",
-            .historyAdvice: "그 시간에 중요한 일을 두세요.",
+            .historyAdvice: "그 시간에 중요한 일을 해보세요.",
             .historyNotEnough: "아직 기록이 적습니다.",
             .historyEmpty: "아직 기록이 없습니다.",
             .weekTotal: "이번 주",
@@ -148,8 +148,8 @@ enum L10n {
             .notifReadyBody: "準備ができたら始めてください。",
 
             .history: "記録",
-            .historyBest: "%1$@の%2$d時前後がいちばん長く集中できています。",
-            .historyAdvice: "その時間に大事な仕事を置いてみてください。",
+            .historyBest: "%1$@の%2$d時前後にいちばん長く集中できています。",
+            .historyAdvice: "その時間に大事な仕事を入れてみてください。",
             .historyNotEnough: "記録がまだ少なめです。",
             .historyEmpty: "まだ記録がありません。",
             .weekTotal: "今週",
