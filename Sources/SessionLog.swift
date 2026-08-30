@@ -28,6 +28,8 @@ enum SessionLog {
     static func line(for s: Session) -> String {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
+        // 오프셋은 ±18시간을 넘지 않아 TimeZone(secondsFromGMT:)가 nil을 낼 일이 없다.
+        // ?? .current는 도달하지 않는 방어 코드일 뿐, 의미 있는 대체값이 아니다.
         f.timeZone = TimeZone(secondsFromGMT: s.offsetSeconds) ?? .current
         return "{\"start\":\"\(f.string(from: s.start))\",\"seconds\":\(s.seconds),\"completed\":\(s.completed)}"
     }
@@ -43,23 +45,29 @@ enum SessionLog {
               let row = try? JSONDecoder().decode(Row.self, from: data) else { return nil }
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
-        guard let date = f.date(from: row.start) else { return nil }
+        // 오프셋을 못 믿으면 날짜를 못 믿는 것과 같다 — 나중에 요일·시간대별 통계가
+        // 전부 이 값에 얹혀서, 그럴듯한 0(UTC 오독)이 nil보다 더 나쁘다.
+        guard let date = f.date(from: row.start),
+              let off = offset(from: row.start) else { return nil }
         return Session(start: date,
-                       offsetSeconds: offset(from: row.start),
+                       offsetSeconds: off,
                        seconds: row.seconds,
                        completed: row.completed)
     }
 
     /// "2026-08-30T15:44:04+09:00" 끝에 붙은 오프셋을 초로. `Z`면 0.
+    /// `±HH:MM` 형식(콜론 포함)이 아니면 nil — 굳이 관대하게 읽어서 잘못된 0을
+    /// 만들 바엔 그 줄을 버리는 편이 낫다.
     ///
     /// `JSONEncoder`의 `.iso8601` 전략은 UTC로 적어 이 정보를 잃는다. 그래서 쓰지 않는다.
-    static func offset(from iso: String) -> Int {
+    static func offset(from iso: String) -> Int? {
         if iso.hasSuffix("Z") { return 0 }
         let tail = iso.suffix(6)                       // +09:00
         guard tail.count == 6,
-              tail.hasPrefix("+") || tail.hasPrefix("-"),
+              (tail.hasPrefix("+") || tail.hasPrefix("-")),
+              tail[tail.index(tail.startIndex, offsetBy: 3)] == ":",
               let h = Int(tail.dropFirst().prefix(2)),
-              let m = Int(tail.suffix(2)) else { return 0 }
+              let m = Int(tail.suffix(2)) else { return nil }
         return (tail.hasPrefix("-") ? -1 : 1) * (h * 3600 + m * 60)
     }
 }

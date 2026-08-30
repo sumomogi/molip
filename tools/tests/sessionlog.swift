@@ -1,16 +1,21 @@
 import Foundation
 
 @main struct SessionLogTests {
-    static func main() {
-        // 2026-08-30 15:44:04 +09:00 을 명시적으로 만든다.
-        // 유닉스 초를 손으로 적으면 틀려도 눈에 안 보인다.
+    // 유닉스 초를 손으로 적으면 틀려도 눈에 안 보인다 — 항상 DateComponents로 만든다.
+    static func makeDate(_ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int, _ se: Int,
+                          offsetSeconds: Int) -> Date {
         var c = DateComponents()
-        c.year = 2026; c.month = 8; c.day = 30
-        c.hour = 15; c.minute = 44; c.second = 4
-        c.timeZone = TimeZone(secondsFromGMT: 9 * 3600)
+        c.year = y; c.month = mo; c.day = d
+        c.hour = h; c.minute = mi; c.second = se
+        c.timeZone = TimeZone(secondsFromGMT: offsetSeconds)
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(secondsFromGMT: 0)!
-        let start = cal.date(from: c)!
+        return cal.date(from: c)!
+    }
+
+    static func main() {
+        // 2026-08-30 15:44:04 +09:00
+        let start = makeDate(2026, 8, 30, 15, 44, 4, offsetSeconds: 9 * 3600)
         let s = Session(start: start, offsetSeconds: 9 * 3600, seconds: 3000, completed: true)
 
         T.eq("한 줄 형식", SessionLog.line(for: s),
@@ -18,14 +23,39 @@ import Foundation
 
         T.eq("되읽기", SessionLog.session(from: SessionLog.line(for: s)), s)
 
+        // 오프셋 보존이 이 파일을 직접 쓰는 이유 전부다 — 양수/음수/30분 단위/UTC 네 갈래를
+        // line(for:) → session(from:) 왕복으로 다 확인한다.
+        let negative = Session(start: makeDate(2026, 8, 30, 1, 44, 4, offsetSeconds: -5 * 3600),
+                                offsetSeconds: -5 * 3600, seconds: 100, completed: false)
+        T.eq("왕복: 음수 오프셋", SessionLog.session(from: SessionLog.line(for: negative)), negative)
+
+        let halfHour = Session(start: makeDate(2026, 8, 30, 19, 14, 4, offsetSeconds: 5 * 3600 + 30 * 60),
+                                offsetSeconds: 5 * 3600 + 30 * 60, seconds: 200, completed: true)
+        T.eq("왕복: 30분 단위 오프셋(인도)", SessionLog.session(from: SessionLog.line(for: halfHour)), halfHour)
+
+        let utc = Session(start: makeDate(2026, 8, 30, 6, 44, 4, offsetSeconds: 0),
+                           offsetSeconds: 0, seconds: 300, completed: false)
+        T.eq("왕복: 오프셋 0 (Z로 기록)", SessionLog.session(from: SessionLog.line(for: utc)), utc)
+
         T.eq("오프셋 파싱", [
             SessionLog.offset(from: "2026-08-30T15:44:04+09:00"),
             SessionLog.offset(from: "2026-08-30T01:44:04-05:00"),
             SessionLog.offset(from: "2026-08-30T06:44:04Z"),
         ], [9 * 3600, -5 * 3600, 0])
 
+        // 콜론 없는 +0900은 그럴듯해 보이지만 형식이 다르다 — 0(UTC)으로 잘못 읽지 말고
+        // nil로 거부해야 나중에 시간대별 통계가 조용히 틀리지 않는다.
+        T.eq("오프셋 파싱: 콜론 없는 오프셋은 nil", SessionLog.offset(from: "2026-08-30T15:44:04+0900"), nil)
+
         T.eq("깨진 줄은 nil", SessionLog.session(from: "{\"start\":\"2026-08"), nil)
         T.eq("빈 줄은 nil", SessionLog.session(from: ""), nil)
+
+        // 콜론 없는 오프셋이 실려온 줄 전체도 세션으로 읽히면 안 된다 — 같은 이유로 통째로 버린다.
+        T.eq("세션 읽기: 콜론 없는 오프셋은 nil",
+             SessionLog.session(from: "{\"start\":\"2026-08-30T15:44:04+0900\",\"seconds\":10,\"completed\":true}"),
+             nil)
+        // 대조군: 형식이 맞으면 여전히 읽힌다.
+        T.ok("세션 읽기: 정상 오프셋은 값을 반환", SessionLog.session(from: SessionLog.line(for: s)) != nil)
 
         T.finish()
     }
