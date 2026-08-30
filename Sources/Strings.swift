@@ -36,10 +36,23 @@ enum L10n {
         // 알림
         case notifWorkDone, notifSetDone, notifRestDone
         case notifRestBody, notifReadyBody
+        // 기록 화면
+        case history, historyBest, historyAdvice, historyNotEnough, historyEmpty
+        case weekTotal, durationHM, durationM
     }
 
-    static func s(_ key: Key) -> String {
-        table[Prefs.language]?[key] ?? table[.en]?[key] ?? ""
+    static func s(_ key: Key) -> String { s(key, lang: Prefs.language) }
+
+    /// 언어를 직접 지정해 꺼낸다. 전수 검사가 설정을 바꾸지 않게 하려는 것이다.
+    static func s(_ key: Key, lang: Lang) -> String {
+        table[lang]?[key] ?? table[.en]?[key] ?? ""
+    }
+
+    /// 영어 폴백 없이, 그 언어 표에 실제로 등록됐는지만 본다.
+    /// s(key, lang:)는 영어로 대신 채워 화면엔 빈 문자열이 안 뜨게 하지만,
+    /// 그 폴백 때문에 전수 검사에서 정작 빠진 언어를 못 잡는다 — 이걸로 잡는다.
+    static func raw(_ key: Key, lang: Lang) -> String? {
+        table[lang]?[key]
     }
 
     static func s(_ key: Key, _ args: CVarArg...) -> String {
@@ -69,6 +82,15 @@ enum L10n {
             .notifRestDone: "휴식 종료",
             .notifRestBody: "%d분 휴식이 시작됐습니다.",
             .notifReadyBody: "준비되면 시작하세요.",
+
+            .history: "기록",
+            .historyBest: "%1$@ %2$d시 전후에 가장 오래 집중했습니다.",
+            .historyAdvice: "그 시간에 중요한 일을 두세요.",
+            .historyNotEnough: "아직 기록이 적습니다.",
+            .historyEmpty: "아직 기록이 없습니다.",
+            .weekTotal: "이번 주",
+            .durationHM: "%d시간 %d분",
+            .durationM: "%d분",
         ],
 
         .en: [
@@ -92,6 +114,15 @@ enum L10n {
             .notifRestDone: "Break over",
             .notifRestBody: "Take a %d-minute break.",
             .notifReadyBody: "Start whenever you're ready.",
+
+            .history: "History",
+            .historyBest: "You focus longest around %2$d:00 on %1$@.",
+            .historyAdvice: "Put your important work there.",
+            .historyNotEnough: "Not enough recorded yet.",
+            .historyEmpty: "Nothing recorded yet.",
+            .weekTotal: "This week",
+            .durationHM: "%dh %dm",
+            .durationM: "%dm",
         ],
 
         .ja: [
@@ -115,6 +146,15 @@ enum L10n {
             .notifRestDone: "休憩終了",
             .notifRestBody: "%d分の休憩を始めます。",
             .notifReadyBody: "準備ができたら始めてください。",
+
+            .history: "記録",
+            .historyBest: "%1$@の%2$d時前後がいちばん長く集中できています。",
+            .historyAdvice: "その時間に大事な仕事を置いてみてください。",
+            .historyNotEnough: "記録がまだ少なめです。",
+            .historyEmpty: "まだ記録がありません。",
+            .weekTotal: "今週",
+            .durationHM: "%d時間%d分",
+            .durationM: "%d分",
         ],
     ]
 }
