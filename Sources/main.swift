@@ -83,6 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 minutes: Int(self.engine.total / 60)
             )
         }
+
+        // 작업 세션이 끝날 때마다 파일에 한 줄 남긴다.
+        engine.onWorkSessionEnded = { session in
+            SessionLog.append(session)
+        }
     }
 
     // MARK: - 메뉴바
@@ -166,5 +171,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 어떤 경로로 닫히든(바깥 클릭, esc, 아이콘 재클릭) 감시자를 정리한다.
     func popoverDidClose(_ notification: Notification) {
         stopWatchingOutsideClicks()
+    }
+
+    /// 작업 중에 앱을 끄면 그때까지 한 만큼은 남긴다.
+    /// stop()이 세션을 닫으면서 onWorkSessionEnded를 부른다.
+    func applicationWillTerminate(_ notification: Notification) {
+        engine.stop()
     }
 }
