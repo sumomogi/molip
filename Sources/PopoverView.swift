@@ -1,5 +1,6 @@
 import SwiftUI
 import ServiceManagement
+import Combine
 
 // MARK: - 공통 타이포
 
@@ -22,13 +23,20 @@ struct RootView: View {
     var onLanguageChange: () -> Void
     var onQuit: () -> Void
 
-    enum Screen { case timer, settings, history }
+    enum Screen { case timer, settings, history, checkout }
     @State private var screen: Screen = .timer
 
     /// 기록 화면에 들어갈 때 한 번만 읽는다.
     /// RootView는 엔진을 관찰하므로, 여기서 바로 파일을 읽으면 타이머가 0.5초마다
     /// 틱할 때마다 디스크를 다시 긁는다.
     @State private var sessions: [Session] = []
+
+    @State private var checkedInAt: Date? = Prefs.checkedInAt
+    /// 근무 시간 표시를 분 단위로만 갱신하기 위한 시계.
+    @State private var dutyTick = Date()
+    /// 체크아웃 순간을 붙잡아 둔다. 마감 화면이 이 값으로 하루를 계산한다.
+    @State private var checkedOutAt = Date()
+    @State private var checkedOutFrom = Date()
 
     // 언어 키를 여기서 관찰한다. 바뀌면 아래 트리 전체가 다시 그려진다.
     @AppStorage(Prefs.Key.language) private var langRaw = Prefs.language.rawValue
@@ -47,13 +55,37 @@ struct RootView: View {
                             onSettings: { screen = .settings })
             case .timer:
                 TimerView(engine: engine,
+                          checkedInAt: checkedInAt,
+                          dutyTick: dutyTick,
+                          onDutyToggle: toggleDuty,
                           onHistory: { sessions = SessionLog.load(); screen = .history },
                           onSettings: { screen = .settings })
+            case .checkout:
+                // TODO: 다음 작업에서 CheckoutView로 대체한다.
+                EmptyView()
             }
         }
         .frame(width: 240)
         .padding(20)
         .onChange(of: langRaw) { _, _ in onLanguageChange() }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { t in
+            dutyTick = t
+        }
+    }
+
+    /// 체크인은 그 자리에서 열고, 체크아웃은 마감 화면으로 넘긴다.
+    private func toggleDuty() {
+        if checkedInAt == nil {
+            let now = Date()
+            Prefs.checkedInAt = now
+            checkedInAt = now
+        } else {
+            engine.stop()                 // 돌고 있던 세션을 먼저 닫아 오늘 몫에 넣는다
+            checkedOutFrom = checkedInAt ?? Date()
+            checkedOutAt = Date()
+            sessions = SessionLog.load()
+            screen = .checkout
+        }
     }
 }
 
@@ -61,6 +93,10 @@ struct RootView: View {
 
 private struct TimerView: View {
     @ObservedObject var engine: TimerEngine
+    let checkedInAt: Date?
+    /// 분이 바뀔 때만 갱신된다. 초 단위로 움직이면 곁눈에 걸린다.
+    let dutyTick: Date
+    var onDutyToggle: () -> Void
     var onHistory: () -> Void
     var onSettings: () -> Void
 
@@ -87,6 +123,10 @@ private struct TimerView: View {
             Text(L10n.s(.set, engine.setIndex, engine.setSize))
                 .font(.caption11)
                 .foregroundStyle(.secondary)
+
+            Spacer().frame(height: 10)
+
+            DutyRow(checkedInAt: checkedInAt, now: dutyTick, onToggle: onDutyToggle)
 
             Spacer().frame(height: 16)
 
@@ -184,6 +224,30 @@ private struct SettingsView: View {
 }
 
 // MARK: - 부품
+
+/// 근무 상태 한 줄. 설정 행들과 같은 골격 — 왼쪽 라벨, 오른쪽 컨트롤.
+///
+/// 아래 버튼 줄이 이미 셋이라 넷째를 넣으면 영어에서 240pt를 넘긴다.
+/// 그래서 근무는 자기 줄을 갖는다.
+private struct DutyRow: View {
+    let checkedInAt: Date?
+    let now: Date
+    var onToggle: () -> Void
+
+    var body: some View {
+        HStack {
+            if let inAt = checkedInAt {
+                Text("\(L10n.s(.onDuty)) \(Workday.clock(max(0, Int(now.timeIntervalSince(inAt)))))")
+                    .font(.control)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            TextButton(L10n.s(checkedInAt == nil ? .checkIn : .checkOut), action: onToggle)
+        }
+        .frame(height: 22)
+    }
+}
 
 private struct NumberRow: View {
     let title: String
