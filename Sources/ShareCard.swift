@@ -110,4 +110,14 @@ enum ShareCard {
         let m = seconds / 60
         return m >= 60 ? L10n.s(.durationHM, m / 60, m % 60) : L10n.s(.durationM, m)
     }
+
+    /// 클립보드에 이미지로 올린다. 어디에 올릴지는 사용자 손에 남는다.
+    /// 공유 시트를 쓰지 않는 이유는 설계 문서에 적어뒀다.
+    @discardableResult
+    static func copyToPasteboard(_ day: Workday) -> Bool {
+        guard let png = png(for: day), let image = NSImage(data: png) else { return false }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        return pb.writeObjects([image])
+    }
 }

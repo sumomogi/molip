@@ -61,8 +61,16 @@ struct RootView: View {
                           onHistory: { sessions = SessionLog.load(); screen = .history },
                           onSettings: { screen = .settings })
             case .checkout:
-                // TODO: 다음 작업에서 CheckoutView로 대체한다.
-                EmptyView()
+                CheckoutView(day: Workday.make(checkedIn: checkedOutFrom,
+                                               checkedOut: checkedOutAt,
+                                               sessions: sessions),
+                             onClose: {
+                                 // 체크인은 체크아웃 버튼이 아니라 마감 화면을 닫을 때 지운다.
+                                 // 화면이 떠 있는 동안엔 값이 남아 있어야 카드가 다시 그려진다.
+                                 Prefs.checkedInAt = nil
+                                 checkedInAt = nil
+                                 screen = .timer
+                             })
             }
         }
         .frame(width: 240)
