@@ -175,7 +175,7 @@ enum L10n {
             .checkIn: "チェックイン",
             .checkOut: "チェックアウト",
             .onDuty: "勤務",
-            .closing: "締め",
+            .closing: "まとめ",
             .copyImage: "画像をコピー",
             .copied: "コピーしました",
             .cardSummary: "勤務 %1$@ のうち %2$d%%",
