@@ -7,18 +7,32 @@ cd "$(dirname "$0")"
 BUNDLE_ID="local.molip.app"
 EXEC="Molip"
 APP="build/Molip.app"
-TARGET="arm64-apple-macosx14.0"
+# 두 아키텍처를 각각 컴파일해 lipo로 합친다. 인텔 맥에서도 돌아야 하는데,
+# arm64 전용 바이너리는 인텔에서 아예 실행되지 않는다 — Rosetta는 x86_64를
+# ARM에서 돌리는 것이라 반대 방향은 없다.
+DEPLOY="macosx14.0"
+ARCHS="arm64 x86_64"
 
 echo "==> 정리"
 rm -rf build
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 echo "==> 컴파일"
-swiftc -O -parse-as-library \
-    -target "$TARGET" \
-    -framework Carbon \
-    -o "$APP/Contents/MacOS/$EXEC" \
-    Sources/*.swift
+SLICES=""
+for arch in $ARCHS; do
+    echo "    $arch"
+    swiftc -O -parse-as-library \
+        -target "$arch-apple-$DEPLOY" \
+        -framework Carbon \
+        -o "build/$EXEC-$arch" \
+        Sources/*.swift
+    SLICES="$SLICES build/$EXEC-$arch"
+done
+
+echo "==> 합치기"
+lipo -create -output "$APP/Contents/MacOS/$EXEC" $SLICES
+rm -f $SLICES
+lipo -info "$APP/Contents/MacOS/$EXEC"
 
 echo "==> 아이콘"
 python3 tools/make_icon.py "$APP/Contents/Resources/AppIcon.icns"
