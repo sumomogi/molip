@@ -65,10 +65,7 @@ struct RootView: View {
                                                checkedOut: checkedOutAt,
                                                sessions: sessions),
                              onClose: {
-                                 // 체크인은 체크아웃 버튼이 아니라 마감 화면을 닫을 때 지운다.
-                                 // 화면이 떠 있는 동안엔 값이 남아 있어야 카드가 다시 그려진다.
-                                 Prefs.checkedInAt = nil
-                                 checkedInAt = nil
+                                 // 체크인은 이미 체크아웃 버튼을 누른 순간 지웠다. 여기선 화면만 닫는다.
                                  screen = .timer
                              })
             }
@@ -78,6 +75,13 @@ struct RootView: View {
         .onChange(of: langRaw) { _, _ in onLanguageChange() }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { t in
             dutyTick = t
+            // 자정을 넘긴 체크인을 여기서도 잡는다. 이 앱은 실행 상태로 며칠씩
+            // 떠 있어서, 시작할 때 한 번 거른 것만으로는 부족하다 — 재실행 없이
+            // 자정을 넘기면 체크인이 계속 쌓인다.
+            if let inAt = checkedInAt, Workday.isStale(inAt, now: t) {
+                Prefs.checkedInAt = nil
+                checkedInAt = nil
+            }
         }
     }
 
@@ -91,6 +95,12 @@ struct RootView: View {
             engine.stop()                 // 돌고 있던 세션을 먼저 닫아 오늘 몫에 넣는다
             checkedOutFrom = checkedInAt ?? Date()
             checkedOutAt = Date()
+            // 체크아웃을 누른 순간 하루를 닫는다. 마감 화면을 카드 복사 전에 그대로
+            // 두고 앱을 종료해도, 다음 실행에서 원래 체크인 시각부터 다시 카운트되어
+            // 종료~재실행 사이 시간이 통째로 근무에 얹히는 일이 없어야 한다.
+            // 카드는 이 값이 아니라 위에서 이미 붙잡은 checkedOutFrom/checkedOutAt으로 그린다.
+            Prefs.checkedInAt = nil
+            checkedInAt = nil
             sessions = SessionLog.load()
             screen = .checkout
         }
